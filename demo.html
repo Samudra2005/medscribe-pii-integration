@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Case File — PII Masking Pipeline</title>
+<style>
+  :root {
+    --paper: #ECEAE1;
+    --paper-raised: #F5F4EE;
+    --ink: #1C1B17;
+    --ink-soft: #56534A;
+    --redact: #0B0B0A;
+    --stamp: #A0301F;
+    --restored: #2F5233;
+    --line: #C7C3B4;
+    --line-strong: #A9A597;
+    --font-display: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif;
+    --font-body: Georgia, "Iowan Old Style", "Times New Roman", serif;
+    --font-data: ui-monospace, "SF Mono", "Cascadia Mono", "Consolas", monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    background-image:
+      repeating-linear-gradient(0deg, rgba(0,0,0,0.015) 0px, rgba(0,0,0,0.015) 1px, transparent 1px, transparent 3px);
+    color: var(--ink);
+    font-family: var(--font-body);
+    line-height: 1.5;
+    padding: 32px 20px 80px;
+  }
+
+  .sheet {
+    max-width: 760px;
+    margin: 0 auto;
+    position: relative;
+  }
+
+  /* ---- header / stamp ---- */
+
+  .stamp {
+    position: absolute;
+    top: -6px;
+    right: 4px;
+    border: 3px solid var(--stamp);
+    color: var(--stamp);
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 12px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 6px 10px;
+    transform: rotate(6deg);
+    opacity: 0.85;
+    border-radius: 2px;
+    user-select: none;
+  }
+
+  .stamp small {
+    display: block;
+    font-size: 8px;
+    letter-spacing: 1.5px;
+    margin-top: 2px;
+    font-weight: 700;
+  }
+
+  header {
+    border-bottom: 3px solid var(--ink);
+    padding-bottom: 18px;
+    margin-bottom: 28px;
+  }
+
+  .eyebrow {
+    font-family: var(--font-display);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-bottom: 10px;
+  }
+
+  h1 {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 34px;
+    letter-spacing: -0.5px;
+    margin: 0 0 8px;
+    max-width: 480px;
+  }
+
+  .subhead {
+    font-family: var(--font-data);
+    font-size: 13px;
+    color: var(--ink-soft);
+  }
+
+  .subhead .arrow { color: var(--stamp); margin: 0 6px; }
+
+  /* ---- section: intake ---- */
+
+  section { margin-bottom: 26px; }
+
+  .field-label {
+    font-family: var(--font-display);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-bottom: 8px;
+  }
+
+  textarea {
+    width: 100%;
+    min-height: 84px;
+    padding: 14px;
+    font-family: var(--font-data);
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--ink);
+    background: var(--paper-raised);
+    border: 1.5px solid var(--line-strong);
+    border-radius: 2px;
+    resize: vertical;
+  }
+
+  textarea:focus-visible, button:focus-visible, input:focus-visible {
+    outline: 2px solid var(--stamp);
+    outline-offset: 2px;
+  }
+
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .chip {
+    font-family: var(--font-display);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    background: transparent;
+    border: 1px solid var(--line-strong);
+    color: var(--ink-soft);
+    padding: 6px 10px;
+    border-radius: 20px;
+    cursor: pointer;
+  }
+
+  .chip:hover { border-color: var(--stamp); color: var(--stamp); }
+
+  .run-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-top: 16px;
+  }
+
+  .run-btn {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 13px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    background: var(--ink);
+    color: var(--paper);
+    border: none;
+    padding: 13px 22px;
+    border-radius: 2px;
+    cursor: pointer;
+  }
+
+  .run-btn:hover { background: var(--stamp); }
+  .run-btn:disabled { background: var(--line-strong); cursor: wait; }
+
+  .settings-toggle {
+    font-family: var(--font-display);
+    font-size: 11px;
+    color: var(--ink-soft);
+    background: none;
+    border: none;
+    text-decoration: underline;
+    cursor: pointer;
+    padding: 0;
+  }
+
+  .settings {
+    display: none;
+    margin-top: 14px;
+    padding: 14px;
+    background: var(--paper-raised);
+    border: 1px dashed var(--line-strong);
+    border-radius: 2px;
+    gap: 10px;
+  }
+
+  .settings.open { display: grid; grid-template-columns: 1fr 1fr; }
+
+  .settings label {
+    font-family: var(--font-display);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  .settings input {
+    width: 100%;
+    font-family: var(--font-data);
+    font-size: 12px;
+    padding: 8px;
+    border: 1px solid var(--line-strong);
+    border-radius: 2px;
+    background: white;
+  }
+
+  /* ---- status strip ---- */
+
+  .status {
+    font-family: var(--font-display);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    margin-top: 14px;
+  }
+
+  .status.live { background: rgba(47,82,51,0.12); color: var(--restored); }
+  .status.sim { background: rgba(160,48,31,0.12); color: var(--stamp); }
+  .status .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+
+  /* ---- pipeline steps ---- */
+
+  .steps { display: none; }
+  .steps.visible { display: block; }
+
+  .step {
+    border: 1.5px solid var(--line-strong);
+    border-radius: 2px;
+    background: var(--paper-raised);
+    margin-bottom: 14px;
+    overflow: hidden;
+    opacity: 0;
+    transform: translateY(6px);
+    animation: rise 0.35s ease forwards;
+  }
+
+  @keyframes rise { to { opacity: 1; transform: translateY(0); } }
+
+  .step-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--line);
+    font-family: var(--font-display);
+  }
+
+  .step-num {
+    font-weight: 800;
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    color: var(--ink-soft);
+  }
+
+  .step-tag {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: var(--stamp);
+  }
+
+  .step-body {
+    padding: 14px;
+    font-family: var(--font-data);
+    font-size: 13.5px;
+    line-height: 1.7;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .meta-row {
+    font-size: 11px;
+    color: var(--ink-soft);
+    margin-top: 8px;
+    border-top: 1px dashed var(--line);
+    padding-top: 8px;
+  }
+
+  /* ---- the signature moment: redaction bars ---- */
+
+  .bar {
+    display: inline-block;
+    height: 0.95em;
+    background: var(--redact);
+    border-radius: 1px;
+    vertical-align: -0.12em;
+    transform-origin: left center;
+    animation: stamp-on 0.28s ease forwards;
+  }
+
+  @keyframes stamp-on {
+    from { transform: scaleX(0); }
+    to { transform: scaleX(1); }
+  }
+
+  /* ---- reveal crossfade for the final step ---- */
+
+  .reveal {
+    display: grid;
+  }
+
+  .reveal > * { grid-area: 1 / 1; transition: opacity 0.5s ease; }
+  .reveal .masked-layer { opacity: 1; }
+  .reveal .real-layer { opacity: 0; }
+  .reveal.revealed .masked-layer { opacity: 0; }
+  .reveal.revealed .real-layer { opacity: 1; color: var(--restored); }
+
+  .empty-note {
+    font-family: var(--font-body);
+    font-style: italic;
+    color: var(--ink-soft);
+    font-size: 13px;
+    border: 1px dashed var(--line-strong);
+    padding: 16px;
+    border-radius: 2px;
+  }
+
+  .error-box {
+    font-family: var(--font-display);
+    font-size: 12.5px;
+    color: var(--stamp);
+    background: rgba(160,48,31,0.08);
+    border: 1px solid var(--stamp);
+    border-radius: 2px;
+    padding: 12px 14px;
+    margin-top: 14px;
+  }
+
+  @media (max-width: 560px) {
+    h1 { font-size: 26px; }
+    .settings.open { grid-template-columns: 1fr; }
+    .stamp { position: static; display: inline-block; margin-bottom: 14px; transform: rotate(-2deg); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .step, .bar { animation: none; opacity: 1; transform: none; }
+    .reveal > * { transition: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="sheet">
+  <div class="stamp">Confidential<small>Internal demo</small></div>
+
+  <header>
+    <div class="eyebrow">PII Masking Middleware — Reference Client</div>
+    <h1>The Redaction Pipeline</h1>
+    <div class="subhead">speech-to-text <span class="arrow">&rarr;</span> mask <span class="arrow">&rarr;</span> model <span class="arrow">&rarr;</span> restore</div>
+  </header>
+
+  <section>
+    <div class="field-label">Subject transcript</div>
+    <textarea id="input">Hi, I am Kabir Malhotra, male, 29, calling from Star Union Bank, phone 98765-43210.</textarea>
+    <div class="chips">
+      <button class="chip" data-text="Hi, I am Kabir Malhotra, male, 29, calling from Star Union Bank, phone 98765-43210.">Person + org + phone</button>
+      <button class="chip" data-text="I was referred here by Dr. Ritu Bansal from Sunrise Medical College.">Title + multi-word org</button>
+      <button class="chip" data-text="My account is with Bank of America, email kabir@example.com.">Org with "of" + email</button>
+      <button class="chip" data-text="This is Cow calling about my dog, Jon.">Edge case: not real names</button>
+    </div>
+
+    <div class="run-row">
+      <button class="run-btn" id="runBtn">Run pipeline</button>
+      <button class="settings-toggle" id="settingsToggle">Middleware settings</button>
+    </div>
+
+    <div class="settings" id="settings">
+      <div>
+        <label for="baseUrl">Middleware URL</label>
+        <input id="baseUrl" value="http://127.0.0.1:8000">
+      </div>
+      <div>
+        <label for="apiKey">API key</label>
+        <input id="apiKey" value="dev-only-key">
+      </div>
+    </div>
+
+    <div id="statusBadge"></div>
+    <div id="errorBox"></div>
+  </section>
+
+  <section class="steps" id="steps">
+    <div class="step" style="animation-delay:0s">
+      <div class="step-head"><span class="step-num">01 — Raw intake</span><span class="step-tag">speech-to-text (simulated)</span></div>
+      <div class="step-body" id="step1"></div>
+    </div>
+
+    <div class="step" style="animation-delay:0.12s">
+      <div class="step-head"><span class="step-num">02 — Redacted</span><span class="step-tag" id="step2tag">sent to model</span></div>
+      <div class="step-body" id="step2"></div>
+    </div>
+
+    <div class="step" style="animation-delay:0.24s">
+      <div class="step-head"><span class="step-num">03 — Model response</span><span class="step-tag">mocked LLM call</span></div>
+      <div class="step-body" id="step3"></div>
+    </div>
+
+    <div class="step" style="animation-delay:0.36s">
+      <div class="step-head"><span class="step-num">04 — Restored</span><span class="step-tag" id="step4tag">shown to user</span></div>
+      <div class="step-body" id="step4"></div>
+    </div>
+  </section>
+
+  <div class="empty-note" id="emptyNote">Enter a transcript above and run the pipeline to see redaction happen, step by step.</div>
+</div>
+
+<script>
+/* =====================================================================
+   Detection + masking logic — a JS mirror of detectors.py / mask_pii.py.
+   Used ONLY as a local fallback when the real middleware at the URL
+   below can't be reached (see runPipeline()). Whenever the real
+   middleware IS reachable, these functions are not used — the results
+   you see come from the actual Python backend.
+   ===================================================================== */
+
+const NEVER_ENTITY = new Set(['i','hi','hello','hey','am','is','are','was','were','the','a','an','and','or','but','this','that','these','those','he','she','they','we','you','it','my','your','his','her','their','our','please','thank','thanks','yes','no','ok','okay','good','morning','afternoon','evening','calling','regarding']);
+const CONNECTORS = new Set(['of','and','&','for','the']);
+const GENDER_TERMS = new Set(['male','female','man','woman','transgender','non-binary']);
+
+const PATTERNS = [
+  ['EMAIL', /[\w.+-]+@[\w-]+\.[\w.-]+/g],
+  ['PHONE', /(?:\+?91[-\s]?)?[6-9]\d{4}[-\s]?\d{5}/g],
+  ['PAN', /\b[A-Z]{5}\d{4}[A-Z]\b/g],
+  ['AADHAAR', /\b\d{4}\s?\d{4}\s?\d{4}\b/g],
+  ['PIN_CODE', /\b\d{6}\b/g],
+  ['AGE', /\b\d{1,3}(?=\s?(?:years old|yo\b|y\/o|-year-old))/g],
+  ['DATE', /\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b|\b\d{4}[/-]\d{1,2}[/-]\d{1,2}\b/g],
+];
+
+function tokenize(text) {
+  const tokens = [];
+  const re = /[A-Za-z']+/g;
+  let m;
+  while ((m = re.exec(text)) !== null) tokens.push({ word: m[0], start: m.index, end: m.index + m[0].length });
+  return tokens;
+}
+
+function structuredSpans(text) {
+  const spans = [];
+  for (const [type, pattern] of PATTERNS) {
+    pattern.lastIndex = 0;
+    let m;
+    while ((m = pattern.exec(text)) !== null) {
+      spans.push({ type, start: m.index, end: m.index + m[0].length, value: m[0] });
+      if (m[0].length === 0) pattern.lastIndex++;
+    }
+  }
+  return spans;
+}
+
+function genderSpans(text) {
+  const spans = [];
+  for (const t of tokenize(text)) if (GENDER_TERMS.has(t.word.toLowerCase())) spans.push({ type: 'GENDER', start: t.start, end: t.end, value: t.word });
+  return spans;
+}
+
+function isEntityWord(word) { return /^[A-Z]/.test(word) && word.length > 1 && !NEVER_ENTITY.has(word.toLowerCase()); }
+
+function nameSpans(text) {
+  const tokens = tokenize(text);
+  const spans = [];
+  let i = 0;
+  const n = tokens.length;
+  while (i < n) {
+    const { word, start, end } = tokens[i];
+    if (isEntityWord(word)) {
+      let j = i + 1, curEnd = end;
+      while (j < n) {
+        const w2 = tokens[j];
+        if (isEntityWord(w2.word)) { curEnd = w2.end; j++; }
+        else if (CONNECTORS.has(w2.word.toLowerCase()) && j + 1 < n && isEntityWord(tokens[j + 1].word)) { curEnd = tokens[j + 1].end; j += 2; }
+        else break;
+      }
+      spans.push({ type: 'NAME', start, end: curEnd, value: text.slice(start, curEnd) });
+      i = j;
+    } else i++;
+  }
+  return spans;
+}
+
+function detect(text) {
+  let spans = [...structuredSpans(text), ...genderSpans(text), ...nameSpans(text)];
+  spans.sort((a, b) => a.start - b.start || (b.end - b.start) - (a.end - a.start));
+  const kept = [];
+  let lastEnd = -1;
+  for (const s of spans) if (s.start >= lastEnd) { kept.push(s); lastEnd = s.end; }
+  return kept;
+}
+
+class Vault {
+  constructor() { this.store = new Map(); this.reverse = new Map(); }
+  mask(text) {
+    const spans = detect(text).sort((a, b) => b.start - a.start);
+    for (const s of spans) {
+      let token = this.reverse.get(s.value);
+      if (!token) {
+        token = '[REDACTED_' + Math.random().toString(16).slice(2, 8) + ']';
+        this.store.set(token, s.value);
+        this.reverse.set(s.value, token);
+      }
+      text = text.slice(0, s.start) + token + text.slice(s.end);
+    }
+    return text;
+  }
+  unmask(text) {
+    for (const [token, real] of this.store.entries()) text = text.split(token).join(real);
+    return text;
+  }
+}
+
+/* ===================== mocked STT + LLM ===================== */
+
+function simulateStt(text) {
+  return { transcript: text, confidence: 0.95, language: 'en-IN', duration_seconds: Math.round((text.length / 15) * 10) / 10 };
+}
+
+function callLlmMock(maskedTranscript) {
+  return `Got it, thanks. Summary: ${maskedTranscript}`;
+}
+
+/* ===================== middleware client ===================== */
+
+class ApiError extends Error {
+  constructor(status, detail) { super(detail); this.status = status; }
+}
+
+async function callMiddleware(path, body, baseUrl, apiKey) {
+  const res = await fetch(baseUrl + path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const errBody = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, errBody.detail || res.statusText);
+  }
+  return res.json();
+}
+
+/* ===================== rendering helpers ===================== */
+
+function escapeHtml(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function renderWithBars(text) {
+  const escaped = escapeHtml(text);
+  return escaped.replace(/\[REDACTED_[0-9a-f]+\]/g, (m) => {
+    const hex = m.replace(/[^0-9a-f]/g, '');
+    const n = parseInt(hex.slice(0, 2), 16) || 0;
+    const widthCh = 3 + (n % 5);
+    return `<span class="bar" style="width:${widthCh}ch"></span>`;
+  });
+}
+
+function setStatus(mode, note) {
+  const el = document.getElementById('statusBadge');
+  el.innerHTML = `<span class="status ${mode === 'live' ? 'live' : 'sim'}"><span class="dot"></span>${note}</span>`;
+}
+
+function setError(msg) {
+  const el = document.getElementById('errorBox');
+  el.innerHTML = msg ? `<div class="error-box">${escapeHtml(msg)}</div>` : '';
+}
+
+/* ===================== the pipeline ===================== */
+
+async function runPipeline() {
+  const text = document.getElementById('input').value.trim();
+  if (!text) return;
+
+  const baseUrl = document.getElementById('baseUrl').value.trim().replace(/\/$/, '');
+  const apiKey = document.getElementById('apiKey').value.trim();
+  const runBtn = document.getElementById('runBtn');
+
+  setError('');
+  runBtn.disabled = true;
+  runBtn.textContent = 'Running…';
+  document.getElementById('emptyNote').style.display = 'none';
+  const stepsEl = document.getElementById('steps');
+  stepsEl.classList.remove('visible');
+  void stepsEl.offsetWidth; // restart the step-rise animation on repeat runs
+  stepsEl.classList.add('visible');
+
+  // ---- step 1: simulated STT ----
+  const stt = simulateStt(text);
+  document.getElementById('step1').textContent = JSON.stringify(stt, null, 2);
+
+  // ---- step 2: mask (live, falling back to local simulation) ----
+  const localVault = new Vault();
+  let live = true, sessionId = null, maskedTranscript;
+
+  try {
+    const maskResult = await callMiddleware('/v1/mask', { payload: { transcript: stt.transcript }, fields: ['transcript'] }, baseUrl, apiKey);
+    maskedTranscript = maskResult.payload.transcript;
+    sessionId = maskResult.session_id;
+    setStatus('live', `LIVE — connected to middleware at ${baseUrl}`);
+  } catch (e) {
+    if (e instanceof ApiError) {
+      setError(`Middleware responded with an error (${e.status}): ${e.message}. Check the API key in settings and try again.`);
+      runBtn.disabled = false;
+      runBtn.textContent = 'Run pipeline';
+      return;
+    }
+    live = false;
+    maskedTranscript = localVault.mask(stt.transcript);
+    setStatus('sim', `SIMULATED — couldn't reach ${baseUrl}. Start server.py (or uvicorn api:app) on that address to see this live.`);
+  }
+
+  document.getElementById('step2').innerHTML = renderWithBars(maskedTranscript);
+  document.getElementById('step2tag').textContent = live ? 'sent to model' : 'sent to model (local sim)';
+
+  // ---- step 3: mocked LLM reply ----
+  const llmReply = callLlmMock(maskedTranscript);
+  document.getElementById('step3').innerHTML = renderWithBars(llmReply);
+
+  // ---- step 4: unmask (must use the SAME path as step 2 — a local
+  // vault has no record of a live session's tokens, and vice versa) ----
+  let realReply;
+  if (live) {
+    try {
+      const unmaskResult = await callMiddleware('/v1/unmask', { payload: { response: llmReply }, fields: ['response'], session_id: sessionId }, baseUrl, apiKey);
+      realReply = unmaskResult.payload.response;
+    } catch (e) {
+      setError(`Mask succeeded live, but unmask failed: ${e.message}. The session may have expired.`);
+      runBtn.disabled = false;
+      runBtn.textContent = 'Run pipeline';
+      return;
+    }
+  } else {
+    realReply = localVault.unmask(llmReply);
+  }
+
+  const step4 = document.getElementById('step4');
+  step4.innerHTML = `<div class="reveal" id="revealBox"><span class="masked-layer">${renderWithBars(llmReply)}</span><span class="real-layer">${escapeHtml(realReply)}</span></div><div class="meta-row">${live ? 'Real values restored by the live middleware.' : 'Real values restored by the local fallback vault.'}</div>`;
+  document.getElementById('step4tag').textContent = 'shown to user';
+
+  setTimeout(() => document.getElementById('revealBox').classList.add('revealed'), 500);
+
+  runBtn.disabled = false;
+  runBtn.textContent = 'Run pipeline';
+}
+
+document.getElementById('runBtn').addEventListener('click', runPipeline);
+
+document.querySelectorAll('.chip').forEach(chip => {
+  chip.addEventListener('click', () => { document.getElementById('input').value = chip.dataset.text; });
+});
+
+document.getElementById('settingsToggle').addEventListener('click', () => {
+  document.getElementById('settings').classList.toggle('open');
+});
+</script>
+
+</body>
+</html>

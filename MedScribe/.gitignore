@@ -1,0 +1,58 @@
+# ==== Secrets & environment ====
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# ==== Python ====
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ==== Node / frontend ====
+node_modules/
+frontend/dist/
+frontend/.vite/
+npm-debug.log*
+
+# ==== ML models / weights (never commit these — huge, pull from HF at runtime) ====
+models/
+*.gguf
+*.safetensors
+*.ckpt
+*.bin
+huggingface_cache/
+
+# ==== Audio / patient data (NEVER commit real or test PHI) ====
+*.wav
+*.mp3
+*.m4a
+*.pdf
+storage/audio/
+storage/transcripts/
+storage/prescriptions/
+
+# ==== Logs ====
+logs/*.log
+logs/**/*.log
+
+# ==== Docker ====
+infra/postgres/data/
+infra/redis/data/
+
+# ==== OS / editor ====
+.DS_Store
+.vscode/*
+!.vscode/settings.json
+*.swp
+
+# ==== Alembic (keep migration scripts, ignore local db state) ====
+*.sqlite3

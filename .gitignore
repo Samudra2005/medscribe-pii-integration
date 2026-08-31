@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environment
+venv/
+.venv/
+env/
+
+# Environment / secrets — never commit real API keys
+.env
+
+# Logs generated while running the servers
+*.log
+
+# OS cruft
+.DS_Store
+Thumbs.db
+
+# Never publish browser/session export files.
+MedScribe/cookies.txt
